@@ -6,16 +6,15 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"github.com/Jarijaas/go-tls-exposed/http/httputil"
-	"github.com/gojektech/heimdall/v6/hystrix"
 	"github.com/golang/protobuf/proto"
 	"github.com/jarijaas/go-gplayapi/pkg/common"
+	"github.com/jarijaas/go-gplayapi/pkg/keyring"
 	"github.com/jarijaas/go-gplayapi/pkg/playstore/pb"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strconv"
-	"time"
 )
 
 const (
@@ -40,32 +39,54 @@ type Config struct {
 }
 
 func CreatePlaystoreAuthClient(config *Config) (*Client, error) {
-	/*httpClient, err := createHTTPClient()
-	if err != nil {
-		return nil, err
-	}*/
+	gsfId, authSub, err := keyring.GetGoogleTokens()
+	if err == nil && gsfId != "" && authSub != "" {
+		log.Tracef("Found GSIF %s and authSub %s tokens from keyring", gsfId, authSub)
+		config.GsfId = gsfId
+		config.AuthSubToken = authSub
+	}
 	return &Client{config: config}, nil
 }
 
-
-type AuthType string
+type Type string
 
 const (
-	EmailPassword AuthType = "email-pass"
-	Unknown AuthType = ""
+	EmailPassword Type = "email-pass"
+	Token         Type = "token"
+	Unknown       Type = ""
 )
 
-func (client *Client) getAuthType() AuthType {
+/**
+Use email and passwd if set, otherwise use tokens
+ */
+func (client *Client) getAuthType() Type {
 	if client.config.Email != "" && client.config.Password != "" {
 		return EmailPassword
+	}
+
+	if client.config.GsfId != ""  && client.config.AuthSubToken  != "" {
+		return Token
 	}
 	return Unknown
 }
 
+/**
+Check if has necessary tokens (GsfId & AuthSub) for authenticated request, does not check if the tokens are valid
+ */
+func (client *Client) HasAuthToken() bool {
+	return client.config.GsfId != "" && client.config.AuthSubToken != ""
+}
+
+func (client *Client) GetGsfId() string {
+	return client.config.GsfId
+}
+
+func (client *Client) GetAuthSubToken() string {
+	return client.config.AuthSubToken
+}
+
 // Get "androidId", which is a device specific GSF (google services framework) ID
 func (client *Client) doCheckin(ac2dmToken string) (string, error) {
-
-
 	username := "username"
 
 	locale := "fi"
@@ -186,12 +207,12 @@ func (client *Client) Authenticate() error {
 	if authType == Unknown {
 		return fmt.Errorf(
 			"could not select authentication type." +
-				"Did you specify the email and the password or alternatively the auth token")
+				"Did you specify the email and the password or alternatively GSFID and authSubToken")
 	}
 
 	switch authType {
 	case EmailPassword:
-		/*encryptedPasswd, err := encryptCredentials(client.config.Email, client.config.Password, nil)
+		encryptedPasswd, err := encryptCredentials(client.config.Email, client.config.Password, nil)
 		if err != nil {
 			return err
 		}
@@ -202,7 +223,9 @@ func (client *Client) Authenticate() error {
 		params.Set("EncryptedPasswd", encryptedPasswd)
 		params.Set("Email", client.config.Email)
 
-		httpClient := createXTLSCHttpClient()
+		log.Infof("%v", params)
+
+		httpClient := createXTLSHttpClient()
 
 		res, err := httpClient.PostForm(AuthURL, params)
 		if err != nil {
@@ -222,7 +245,6 @@ func (client *Client) Authenticate() error {
 		}
 		log.Debugf("Got ac2dm token: %s", ac2dmToken)
 
-
 		client.config.GsfId, err = client.doCheckin(ac2dmToken)
 		if err != nil {
 			return err
@@ -236,33 +258,21 @@ func (client *Client) Authenticate() error {
 
 		log.Infof("Got GsfId and AuthSubToken, saving these to keyring")
 
-		/*err = client.checkTOC()
+		err = keyring.SaveToken(keyring.GSFID, client.config.GsfId)
 		if err != nil {
 			return err
-		}*/
+		}
 
-
-
-		/*for _, entry := range searchRes.Entry {
-			if entry == nil {
-				continue
-			}
-
-			log.Infof("Found app: %s", *entry.Title)
-		}*/
+		err = keyring.SaveToken(keyring.AuthSubToken, client.config.AuthSubToken)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 
-func createHTTPClient() (*hystrix.Client, error) {
-	return hystrix.NewClient(
-		hystrix.WithHTTPTimeout(5 * time.Second),
-		hystrix.WithMaxConcurrentRequests(10),
-		hystrix.WithErrorPercentThreshold(20),
-	), nil
-}
 
 /*
 // FDFEUrl is a base URL for Playstore DFE api

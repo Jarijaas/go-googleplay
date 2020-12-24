@@ -1,13 +1,18 @@
 package playstore
 
 import (
+	"errors"
 	"fmt"
+	"github.com/gojektech/heimdall/v6/hystrix"
+	"github.com/golang/protobuf/proto"
 	"github.com/jarijaas/go-gplayapi/pkg/auth"
 	"github.com/jarijaas/go-gplayapi/pkg/common"
 	"github.com/jarijaas/go-gplayapi/pkg/playstore/pb"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"time"
 )
 
 const (
@@ -18,51 +23,54 @@ const (
 
 type Client struct {
 
-	authedClient *auth.Client
+	authClient *auth.Client
 
 }
 
 type Config struct {
 
-	authConfig *auth.Config
+	AuthConfig *auth.Config
 }
 
 func CreatePlaystoreClient(config *Config) (*Client, error) {
-	authedClient, err := auth.CreatePlaystoreAuthClient(config.authConfig)
+	authedClient, err := auth.CreatePlaystoreAuthClient(config.AuthConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		authedClient: authedClient,
+		authClient: authedClient,
 	}, nil
 }
 
-func (client *Client) Search(query string) error {
-
-	httpClient2, err := createHTTPClient()
-	if err != nil {
-		return err
+func (client *Client) get(url string) (*pb.ResponseWrapper, error) {
+	// Do auth if needed
+	if !client.authClient.HasAuthToken() {
+		if err := client.authClient.Authenticate(); err != nil {
+			return nil, err
+		}
 	}
 
-	searchReq, err := http.NewRequest("GET", fmt.Sprintf("%s?c=3&q=%s", SearchUrl, "posti"), nil)
+	httpClient, err := createHTTPClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	searchReq.Header.Set("X-DFE-Device-Id", "")
-	// searchReq.Header.Set("Authorization", fmt.Sprintf("GoogleLogin auth=%s", client.config.AuthSubToken))
-	searchReq.Header.Set("Authorization", "GoogleLogin auth=")
-
-	reqRaw, _ := httputil.DumpRequest(searchReq, true)
-	fmt.Print(string(reqRaw))
-
-	searchReqRes, err := httpClient2.Do(searchReq)
+	searchReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	log.Infof("Search http status: %s", searchReqRes.Status)
+	searchReq.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
+	searchReq.Header.Set("Authorization", fmt.Sprintf(
+		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
+
+	searchReqRes, err := httpClient.Do(searchReq)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("http status: %s", searchReqRes.Status)
 
 	data, err := ioutil.ReadAll(searchReqRes.Body)
 
@@ -71,22 +79,29 @@ func (client *Client) Search(query string) error {
 	var responseWrapper pb.ResponseWrapper
 	err = proto.Unmarshal(data, &responseWrapper)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if responseWrapper.Commands != nil && responseWrapper.Commands.DisplayErrorMessage != nil {
-		log.Fatal(*responseWrapper.Commands.DisplayErrorMessage)
+		return &responseWrapper, errors.New(*responseWrapper.Commands.DisplayErrorMessage)
 	}
+	return &responseWrapper, nil
+}
 
-	searchRes := responseWrapper.Payload.SearchResponse
+func (client *Client) Search(query string) (*pb.SearchResponse, error) {
 
-	log.Infof("searchResponse: %v", searchRes)
+	resWrap, err := client.get(fmt.Sprintf("%s?c=3&q=%s", SearchUrl, query))
+	if err != nil {
+		return nil, err
+	}
+	return resWrap.Payload.SearchResponse, err
+
+	/*log.Infof("searchResponse: %v", searchRes)
 
 	for _, doc := range searchRes.Doc {
 		if doc == nil {
 			continue
 		}
-
 
 		log.Infof("Found docId: %s", *doc.Docid)
 
@@ -104,6 +119,16 @@ func (client *Client) Search(query string) error {
 
 	log.Infof("Next page url: %s", searchRes.GetNextPageUrl())
 
+	return nil*/
+}
+
+
+func createHTTPClient() (*hystrix.Client, error) {
+	return hystrix.NewClient(
+		hystrix.WithHTTPTimeout(5 * time.Second),
+		hystrix.WithMaxConcurrentRequests(10),
+		hystrix.WithErrorPercentThreshold(20),
+	), nil
 }
 
 /**
@@ -121,8 +146,20 @@ Download app from playstore by its package name
 In order to download the app, the app is "purchased" first
 If `versionCode` is nil, downloads the latest version
  */
-func (client *Client) Download(packageName string, versionCode *int) (io.Reader, error)  {
+func (client *Client) Download(packageName string, versionCode int) (io.Reader, error)  {
 
+	_, err := client.Search("")
+	if err != nil {
+		return nil, err
+	}
 
+	return nil, nil
+}
 
+/**
+Check if the client has valid auth creds to the playstore
+ */
+func (client *Client) IsValidAuthToken() bool {
+	_, err := client.Search("")
+	return err == nil
 }

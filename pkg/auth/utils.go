@@ -89,7 +89,7 @@ func encryptCredentials(email string, password string, randSrc *io.Reader) (stri
 // Create http client that bypasses the TLS fingerprint check
 // Uses modified tls package, so may be insecure
 // Therefore, use this only when necessary
-func createXTLSCHttpClient() *xhttp.Client {
+func createXTLSHttpClient() *xhttp.Client {
 	conf := &xtls.Config{
 		CipherSuites: []uint16{
 			0x1302,			0x1303,			0x1301,			0xc02c,
@@ -153,7 +153,7 @@ func getSecondRoundToken(masterToken string, gsfId string) (string, error) {
 	params.Set("device_country", "fi")
 	params.Set("has_permission", "1")
 
-	httpClient := createXTLSCHttpClient()
+	httpClient := createXTLSHttpClient()
 
 	req, err := xhttp.NewRequest("POST", AuthURL, strings.NewReader(params.Encode()))
 	if err != nil {
@@ -196,7 +196,7 @@ func getPlayStoreAuthSubToken(email string, gsfId string, encryptedPasswd string
 	params.Set("device_country", "fi")
 	params.Set("has_permission", "1")
 
-	httpClient := createXTLSCHttpClient()
+	httpClient := createXTLSHttpClient()
 
 	req, err := xhttp.NewRequest("POST", AuthURL, strings.NewReader(params.Encode()))
 	if err != nil {

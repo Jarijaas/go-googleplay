@@ -8,7 +8,8 @@ require (
 	github.com/gojektech/heimdall/v6 v6.1.0
 	github.com/golang/protobuf v1.4.3
 	github.com/sirupsen/logrus v1.7.0
-	github.com/smartystreets/goconvey v1.6.4 // indirect
+	github.com/spf13/cobra v1.1.1
 	github.com/zalando/go-keyring v0.1.0
+	golang.org/x/crypto v0.0.0-20201217014255-9d1352758620
 	google.golang.org/protobuf v1.25.0
 )

@@ -8,12 +8,12 @@ import (
 func TestKeyringToken(t *testing.T)  {
 	tokenIn := "test-token"
 
-	err := SaveToken(tokenIn)
+	err := SaveToken(GSFID, tokenIn)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tokenOut, err := GetToken()
+	tokenOut, err := GetToken(GSFID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +23,7 @@ func TestKeyringToken(t *testing.T)  {
 			tokenIn, tokenOut)
 	}
 
-	err = DeleteToken()
+	err = DeleteToken(GSFID)
 	if err != nil {
 		log.Fatalf("Could not delete auth token: %v", err)
 	}
