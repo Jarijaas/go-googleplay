@@ -2,16 +2,10 @@ package keyring
 
 import (
 	"log"
-	"os"
 	"testing"
 )
 
 func TestKeyringToken(t *testing.T)  {
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		t.Skip("Skip keyring test because it fails in github actions")
-		return
-	}
-
 	tokenIn := "test-token"
 
 	err := SaveToken(GSFID, tokenIn)

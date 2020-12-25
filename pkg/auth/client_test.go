@@ -33,8 +33,8 @@ func TestKeyValueParser(t *testing.T) {
 	r := strings.NewReader("LSID=BAD_COOKIE\r\nAuth=123")
 	kvs := parseKeyValues(r)
 
-	if kvs["Auth"] != "123" {
-		t.Errorf("Key value is incorrect: %s", kvs["Auth"])
+	if kvs["auth"] != "123" {
+		t.Errorf("Key value is incorrect: %s", kvs["auth"])
 	}
 }
 
