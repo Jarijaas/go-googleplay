@@ -1,0 +1,6 @@
+builds:
+  - id: gplay-cli
+    main: ./cmd/gplaycli/main.go
+    goos:
+      - linux
+      - windows
