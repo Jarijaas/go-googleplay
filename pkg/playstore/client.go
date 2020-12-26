@@ -90,6 +90,8 @@ func (client *Client) get(url string) (*pb.ResponseWrapper, error) {
 
 func (client *Client) Search(query string) (*pb.SearchResponse, error) {
 
+	// c param is content type, 0=book global?, 1=book, 3=app, 4=video
+
 	resWrap, err := client.get(fmt.Sprintf("%s?c=3&q=%s", SearchUrl, query))
 	if err != nil {
 		return nil, err
@@ -123,6 +125,40 @@ func (client *Client) Search(query string) (*pb.SearchResponse, error) {
 }
 
 
+// DownloadFile downloads a file and write it to disk during download
+// https://golangcode.com/download-a-file-from-a-url/
+/*func DownloadFile(urlPath string, dir string, filename string) error {
+	client, err := newHTTPClient()
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("GET", urlPath, nil)
+	if err != nil {
+		return err
+	}
+
+	// Get the data
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	filepath := fmt.Sprintf("%s/%s", dir, filename)
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
+}*/
+
 func createHTTPClient() (*hystrix.Client, error) {
 	return hystrix.NewClient(
 		hystrix.WithHTTPTimeout(5 * time.Second),
@@ -148,9 +184,25 @@ If `versionCode` is nil, downloads the latest version
  */
 func (client *Client) Download(packageName string, versionCode int) (io.Reader, error)  {
 
-	_, err := client.Search("")
+	searchRes, err := client.Search("posti")
 	if err != nil {
 		return nil, err
+	}
+
+
+	for _, doc := range searchRes.Doc {
+		if doc == nil {
+			continue
+		}
+		// log.Infof("doc: %v", doc)
+
+		for _, child := range doc.Child {
+			if child == nil {
+				continue
+			}
+			log.Infof("child: %s", *child.Title)
+		}
+
 	}
 
 	return nil, nil

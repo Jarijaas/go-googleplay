@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strconv"
 )
 
@@ -86,7 +85,7 @@ func (client *Client) GetAuthSubToken() string {
 }
 
 // Get "androidId", which is a device specific GSF (google services framework) ID
-func (client *Client) doCheckin(ac2dmToken string) (string, error) {
+func (client *Client) getGsfId() (string, error) {
 	username := "username"
 
 	locale := "fi"
@@ -164,27 +163,6 @@ func (client *Client) doCheckin(ac2dmToken string) (string, error) {
 		return "", err
 	}
 
-	if checkinResp.AndroidId != nil {
-		log.Infof("Got androidId: %d", *checkinResp.AndroidId)
-	}
-
-	for _, setting := range checkinResp.Setting {
-		log.Infof("Setting: %s, Value: %s", string(setting.Name), string(setting.Value))
-	}
-
-	token := checkinResp.DeviceCheckinConsistencyToken
-	if token == nil {
-		return "", fmt.Errorf("DeviceCheckinConsistencyToken in checkin response does not exist")
-	}
-	log.Debugf("Got DeviceCheckinConsistencyToken: %s", *token)
-
-	client.deviceConsistencyToken = *token
-
-	checkinReq.Id = checkinResp.AndroidId
-	checkinReq.SecurityToken = checkinResp.SecurityToken
-	checkinReq.AccountCookie = append(checkinReq.AccountCookie, fmt.Sprintf("[%s]", client.config.Email))
-	checkinReq.AccountCookie = append(checkinReq.AccountCookie, ac2dmToken)
-
 	rawMsg, err = proto.Marshal(checkinReq)
 	if err != nil {
 		return "", err
@@ -217,13 +195,11 @@ func (client *Client) Authenticate() error {
 			return err
 		}
 
-		params := url.Values{}
+		/*params := url.Values{}
 		params.Set("service", "ac2dm")
-		params.Set("add_account", "0")
+		params.Set("add_account", "1")
 		params.Set("EncryptedPasswd", encryptedPasswd)
 		params.Set("Email", client.config.Email)
-
-		log.Infof("%v", params)
 
 		httpClient := createXTLSHttpClient()
 
@@ -234,6 +210,8 @@ func (client *Client) Authenticate() error {
 
 		kvs := parseKeyValues(res.Body)
 
+		log.Infof("%v", kvs)
+
 		errorDesc, has := kvs["error"]
 		if has {
 			return fmt.Errorf("google auth API returned error: %s", errorDesc)
@@ -243,15 +221,14 @@ func (client *Client) Authenticate() error {
 		if !has {
 			return fmt.Errorf("google auth API response did not contain ac2dm token. Response: %v", kvs)
 		}
-		log.Debugf("Got ac2dm token: %s", ac2dmToken)
+		log.Debugf("Got ac2dm token: %s", ac2dmToken)*/
 
-		client.config.GsfId, err = client.doCheckin(ac2dmToken)
+		client.config.GsfId, err = client.getGsfId()
 		if err != nil {
 			return err
 		}
 
-		client.config.AuthSubToken, err = getPlayStoreAuthSubToken(client.config.Email, client.config.GsfId,
-			encryptedPasswd)
+		client.config.AuthSubToken, err = getPlayStoreAuthSubToken(client.config.Email, encryptedPasswd)
 		if err != nil {
 			return err
 		}
@@ -271,110 +248,3 @@ func (client *Client) Authenticate() error {
 
 	return nil
 }
-
-
-
-/*
-// FDFEUrl is a base URL for Playstore DFE api
-var FDFEUrl = "https://android.clients.google.com/fdfe"
-
-func dfeGetReq(dfeURL string, deviceID string) ([]byte, error) {
-	client, err := newHTTPClient()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", dfeURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Android device ID, required for all DFE api requests, must be a valid device ID
-	req.Header.Add("X-DFE-Device-Id", deviceID)
-
-	req.AddCookie(&http.Cookie{Domain: ".google.com", Name: "HSID", Value: "A1-ROoNZ4JkZFEork"})
-	req.AddCookie(&http.Cookie{Domain: ".google.com", Name: "SSID", Value: "ADH00LW58WvhDUs-m"})
-	req.AddCookie(&http.Cookie{Domain: ".google.com", Name: "SID", Value: "FAew0fFsuiIR9aFikGdgIdSUdwAOj1Ud1v0O7lh4_wRjVRsKiej4TXteVoiVG0fyjULihQ."})
-
-	// Get the data
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return ioutil.ReadAll(resp.Body)
-}
-/*
-// GetAppDetails retrieves app details. E.g name, version, description
-func GetAppDetails(docID string, deviceID string) (*app_details.AppDetailsMessage, error) {
-
-	detailsURL := fmt.Sprintf("%s/details?doc=%s", FDFEUrl, docID)
-	rawProtoMessage, err := dfeGetReq(detailsURL, deviceID)
-	if err != nil {
-		return nil, err
-	}
-
-	details := &app_details.AppDetailsMessage{}
-
-	err = proto.Unmarshal(rawProtoMessage, details)
-	if err != nil {
-		return nil, err
-	}
-
-	return details, nil
-}
-
-// GetAppDeliveryManifest downloads application delivery manifest from the playstore
-// It contains file sizes and download URLs for each download
-func GetAppDeliveryManifest(docID string, versionCode int, deviceID string) (*app_download_manifest.DeliveryManifest, error) {
-
-	manifestURL := fmt.Sprintf("%s/delivery?doc=%s&ot=1&vc=%d&ia=false&fdcf=1&fdcf=2&da=22", FDFEUrl, docID, versionCode)
-	rawProtoMessage, err := dfeGetReq(manifestURL, deviceID)
-	if err != nil {
-		return nil, err
-	}
-
-	manifest := &app_download_manifest.DeliveryManifest{}
-
-	err = proto.Unmarshal(rawProtoMessage, manifest)
-	if err != nil {
-		return nil, err
-	}
-
-	return manifest, nil
-}
-
-// DownloadFile downloads a file and write it to disk during download
-// https://golangcode.com/download-a-file-from-a-url/
-func DownloadFile(urlPath string, dir string, filename string) error {
-	client, err := newHTTPClient()
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("GET", urlPath, nil)
-	if err != nil {
-		return err
-	}
-
-	// Get the data
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	filepath := fmt.Sprintf("%s/%s", dir, filename)
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// Write the body to file
-	_, err = io.Copy(out, resp.Body)
-	return err
-}*/

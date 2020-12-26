@@ -135,23 +135,23 @@ func createXTLSHttpClient() *xhttp.Client {
 	return &xhttp.Client{Transport: transport}
 }
 
-func getSecondRoundToken(masterToken string, gsfId string) (string, error) {
+func getSubToken(masterToken string) (string, error) {
 
 	params := url.Values{}
 	params.Set("service", "androidmarket")
-	params.Set("app", "com.android.vending")
+	// params.Set("app", "com.android.vending")
 	params.Set("Token", masterToken)
-	params.Set("token_request_options", "CAA4AQ==")
+	/*params.Set("token_request_options", "CAA4AQ==")
 	params.Set("system_partition", "1")
-	params.Set("_opt_is_called_from_account_manager", "1")
+	params.Set("_opt_is_called_from_account_manager", "1")*/
 
 
-	params.Set("source", "android")
+	/*params.Set("source", "android")
 	params.Set("client_sig", "38918a453d07199354f8b19af05ec6562ced5788")
 	params.Set("callerSig", "38918a453d07199354f8b19af05ec6562ced5788")
 	params.Set("lang", "fi")
 	params.Set("device_country", "fi")
-	params.Set("has_permission", "1")
+	params.Set("has_permission", "1")*/
 
 	httpClient := createXTLSHttpClient()
 
@@ -161,8 +161,8 @@ func getSecondRoundToken(masterToken string, gsfId string) (string, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("device", gsfId)
-	req.Header.Set("app", "com.android.vending")
+	/*req.Header.Set("device", gsfId)
+	req.Header.Set("app", "com.android.vending")*/
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -177,24 +177,25 @@ func getSecondRoundToken(masterToken string, gsfId string) (string, error) {
 	}
 
 	log.Infof("Round token results: %v", kvs)
-	return "", nil
+	return kvs["auth"], nil
 }
 
-func getPlayStoreAuthSubToken(email string, gsfId string, encryptedPasswd string) (string, error) {
+func getPlayStoreAuthSubToken(email string, encryptedPasswd string) (string, error) {
 
 	params := url.Values{}
 	params.Set("service", "androidmarket")
-	params.Set("app", "com.android.vending")
+	// params.Set("app", "com.android.vending")
 
 	params.Set("Email", email)
 	params.Set("EncryptedPasswd", encryptedPasswd)
+	params.Set("add_account", "1")
 
-	params.Set("source", "android")
+	/*params.Set("source", "android")
 	params.Set("client_sig", "38918a453d07199354f8b19af05ec6562ced5788")
 	params.Set("callerSig", "38918a453d07199354f8b19af05ec6562ced5788")
 	params.Set("lang", "fi")
 	params.Set("device_country", "fi")
-	params.Set("has_permission", "1")
+	params.Set("has_permission", "1")*/
 
 	httpClient := createXTLSHttpClient()
 
@@ -204,8 +205,6 @@ func getPlayStoreAuthSubToken(email string, gsfId string, encryptedPasswd string
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("device", gsfId)
-	req.Header.Set("app", "com.android.vending")
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -225,7 +224,5 @@ func getPlayStoreAuthSubToken(email string, gsfId string, encryptedPasswd string
 	}
 
 	log.Debugf("Got master token: %s", masterToken)
-	log.Debugf("AuthSubToken response: %v", kvs)
-
-	return getSecondRoundToken(masterToken, gsfId)
+	return getSubToken(masterToken)
 }
