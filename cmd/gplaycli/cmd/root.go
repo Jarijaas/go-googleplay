@@ -16,23 +16,30 @@ var (
 	gsfId string
 	authSub string
 	forceLogin bool
+	verbose bool
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "gplay",
-	Short: "Allows browsing the Google Playstore, including downloading apps",
-	Run: func(cmd *cobra.Command, args []string) {
-		// Do Stuff Here
+	Short: "Client for the Google Playstore, can download apps and browse the store",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if verbose {
+			log.SetLevel(log.DebugLevel)
+		}
 	},
 }
 
 func Execute() {
 	rootCmd.PersistentFlags().StringVar(&email, "email", "", "")
 	rootCmd.PersistentFlags().StringVar(&password, "password", "", "")
-	rootCmd.PersistentFlags().StringVar(&gsfId, "gsfId", "", "")
-	rootCmd.PersistentFlags().StringVar(&authSub, "authSub", "", "")
+	rootCmd.PersistentFlags().StringVar(&gsfId, "gsfId", "",
+		"Alternatively, set env var GPLAY_GSFID")
+	rootCmd.PersistentFlags().StringVar(&authSub, "authSub", "",
+		"Alternatively, set env var GPLAY_AUTHSUB")
 	rootCmd.PersistentFlags().BoolVar(&forceLogin, "force-login", false,
 		"Authenticate, even if current gsfId and authSubToken are valid")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false,
+		"Enable debug messages")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -40,6 +47,14 @@ func Execute() {
 }
 
 func createPlaystoreClient() (*playstore.Client, error) {
+	// Check env variables, if cli arguments were not set
+	if gsfId == "" {
+		gsfId = os.Getenv("GPLAY_GSFID")
+	}
+	if authSub == "" {
+		authSub = os.Getenv("GPLAY_AUTHSUB")
+	}
+
 	authCfg := &auth.Config{
 		Email:        email,
 		Password:     password,

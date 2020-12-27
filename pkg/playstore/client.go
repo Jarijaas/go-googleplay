@@ -43,6 +43,10 @@ func CreatePlaystoreClient(config *Config) (*Client, error) {
 	}, nil
 }
 
+func (client *Client) GetAuthClient() *auth.Client {
+	return client.authClient
+}
+
 func (client *Client) get(url string) (*pb.ResponseWrapper, error) {
 	// Do auth if needed
 	if !client.authClient.HasAuthToken() {
@@ -69,8 +73,6 @@ func (client *Client) get(url string) (*pb.ResponseWrapper, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Infof("http status: %s", searchReqRes.Status)
 
 	data, err := ioutil.ReadAll(searchReqRes.Body)
 
