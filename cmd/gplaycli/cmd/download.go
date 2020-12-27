@@ -12,7 +12,7 @@ var (
 
 func init() {
 	downloadCmd.Flags().StringVar(&appPackageName, "id", "", "The app package name e.g., \"com.whatsapp\"")
-	downloadCmd.Flags().IntVarP(&appVersionCode, "version", "v", 0,
+	downloadCmd.Flags().IntVar(&appVersionCode, "version",  0,
 		"App version code, latest if not specified")
 	downloadCmd.Flags().StringVar(&outFilepath, "out", "", "Where to download the app")
 
