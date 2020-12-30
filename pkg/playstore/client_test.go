@@ -11,9 +11,16 @@ import (
 const TestPackageName = "com.whatsapp"
 
 func createPlayStoreTestClient(t *testing.T) *Client {
+	gsfId := os.Getenv("GPLAY_GSFID")
+	authSub := os.Getenv("GPLAY_AUTHSUB")
+
+	if gsfId == "" || authSub == "" {
+		t.Skip("gsfId or authSub is not specified, skip test")
+	}
+
 	authConfig := &auth.Config{
-		GsfId:        os.Getenv("GPLAY_GSFID"),
-		AuthSubToken: os.Getenv("GPLAY_AUTHSUB"),
+		GsfId:        os.Getenv(gsfId),
+		AuthSubToken: os.Getenv(authSub),
 	}
 
 	client, err := CreatePlaystoreClient(&Config{AuthConfig: authConfig})
