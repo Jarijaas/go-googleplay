@@ -1,4 +1,4 @@
-# [WIP] Google Playstore Client
+# Google Playstore Client
 
 Binaries are [here](https://github.com/Jarijaas/go-googleplay/releases)
 
@@ -30,6 +30,11 @@ Flags:
   -v, --verbose           Enable debug messages
 
 Use "gplay [command] --help" for more information about a command.
+```
+
+For example, to download whatsapp:
+```
+gplay download --id com.whatsapp --out whatsapp.apk
 ```
 
 Environment variables
