@@ -38,11 +38,13 @@ type Config struct {
 }
 
 func CreatePlaystoreAuthClient(config *Config) (*Client, error) {
-	gsfId, authSub, err := keyring.GetGoogleTokens()
-	if err == nil && gsfId != "" && authSub != "" {
-		log.Tracef("Found GSIF %s and authSub %s tokens from keyring", gsfId, authSub)
-		config.GsfId = gsfId
-		config.AuthSubToken = authSub
+	if config.GsfId == "" && config.AuthSubToken == "" {
+		gsfId, authSub, err := keyring.GetGoogleTokens()
+		if err == nil && gsfId != "" && authSub != "" {
+			log.Tracef("Found GSIF %s and authSub %s tokens from keyring", gsfId, authSub)
+			config.GsfId = gsfId
+			config.AuthSubToken = authSub
+		}
 	}
 	return &Client{config: config}, nil
 }

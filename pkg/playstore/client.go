@@ -1,6 +1,8 @@
 package playstore
 
 import (
+	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/gojektech/heimdall/v6/hystrix"
@@ -9,9 +11,11 @@ import (
 	"github.com/jarijaas/go-gplayapi/pkg/common"
 	"github.com/jarijaas/go-gplayapi/pkg/playstore/pb"
 	log "github.com/sirupsen/logrus"
-	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"path"
+	"strconv"
 	"time"
 )
 
@@ -19,6 +23,8 @@ const (
 	FDFEUrl = common.APIBaseURL + "/fdfe/"
 	SearchUrl = FDFEUrl + "search"
 	TocUrl = FDFEUrl + "toc"
+	DetailsUrl = FDFEUrl + "details"
+	PurchaseUrl = FDFEUrl + "purchase"
 )
 
 type Client struct {
@@ -60,23 +66,64 @@ func (client *Client) get(url string) (*pb.ResponseWrapper, error) {
 		return nil, err
 	}
 
-	searchReq, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	searchReq.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
-	searchReq.Header.Set("Authorization", fmt.Sprintf(
+	req.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
+	req.Header.Set("Authorization", fmt.Sprintf(
 		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
 
-	searchReqRes, err := httpClient.Do(searchReq)
+	reqRes, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := ioutil.ReadAll(searchReqRes.Body)
+	data, err := ioutil.ReadAll(reqRes.Body)
 
-	// fmt.Print(string(data))
+	var responseWrapper pb.ResponseWrapper
+	err = proto.Unmarshal(data, &responseWrapper)
+	if err != nil {
+		return nil, err
+	}
+
+	if responseWrapper.Commands != nil && responseWrapper.Commands.DisplayErrorMessage != nil {
+		return &responseWrapper, errors.New(*responseWrapper.Commands.DisplayErrorMessage)
+	}
+	return &responseWrapper, nil
+}
+
+func (client *Client) post(url string, params *url.Values) (*pb.ResponseWrapper, error) {
+	// Do auth if needed
+	if !client.authClient.HasAuthToken() {
+		if err := client.authClient.Authenticate(); err != nil {
+			return nil, err
+		}
+	}
+
+	httpClient, err := createHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBufferString(params.Encode()))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
+	req.Header.Set("Authorization", fmt.Sprintf(
+		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	reqRes, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ioutil.ReadAll(reqRes.Body)
 
 	var responseWrapper pb.ResponseWrapper
 	err = proto.Unmarshal(data, &responseWrapper)
@@ -126,41 +173,6 @@ func (client *Client) Search(query string) (*pb.SearchResponse, error) {
 	return nil*/
 }
 
-
-// DownloadFile downloads a file and write it to disk during download
-// https://golangcode.com/download-a-file-from-a-url/
-/*func DownloadFile(urlPath string, dir string, filename string) error {
-	client, err := newHTTPClient()
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("GET", urlPath, nil)
-	if err != nil {
-		return err
-	}
-
-	// Get the data
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	filepath := fmt.Sprintf("%s/%s", dir, filename)
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// Write the body to file
-	_, err = io.Copy(out, resp.Body)
-	return err
-}*/
-
 func createHTTPClient() (*hystrix.Client, error) {
 	return hystrix.NewClient(
 		hystrix.WithHTTPTimeout(5 * time.Second),
@@ -172,42 +184,97 @@ func createHTTPClient() (*hystrix.Client, error) {
 /**
 Get app details by its package name
  */
-func (client *Client) GetDetails(packageName string) {
+func (client *Client) GetDetails(packageName string) (*pb.DocV2, error) {
+	resWrap, err := client.get(fmt.Sprintf("%s?doc=%s", DetailsUrl, packageName))
+	if err != nil {
+		return nil, err
+	}
+	return resWrap.Payload.DetailsResponse.DocV2, nil
+}
 
 
+func (client *Client) Purchase(packageName string, versionCode int) (*pb.BuyResponse, error) {
+	params := &url.Values{}
+	params.Set("ot", "1")
+	params.Set("doc", packageName)
+	params.Set("vc", strconv.Itoa(versionCode))
 
+	res, err := client.post(PurchaseUrl, params)
+	if err != nil {
+		return nil, err
+	}
+	return res.Payload.BuyResponse, nil
 }
 
 /**
-Download app from playstore by its package name
+Get app delivery data (download URL) for application from playstore
 
 In order to download the app, the app is "purchased" first
-If `versionCode` is nil, downloads the latest version
+If `versionCode` is zero, get delivery data for the latest version
  */
-func (client *Client) Download(packageName string, versionCode int) (io.Reader, error)  {
+func (client *Client) GetAppDeliveryData(packageName string, versionCode int) (*pb.AndroidAppDeliveryData, error)  {
 
-	searchRes, err := client.Search("posti")
+	// Get latest version code
+	if versionCode == 0 {
+		doc, err := client.GetDetails(packageName)
+		if err != nil {
+			return nil, err
+		}
+		versionCode = int(*doc.Details.AppDetails.VersionCode)
+
+		log.Debugf("Latest %s version code: %d", packageName, versionCode)
+	}
+
+	buyRes, err := client.Purchase(packageName, versionCode)
 	if err != nil {
 		return nil, err
 	}
 
-
-	for _, doc := range searchRes.Doc {
-		if doc == nil {
-			continue
-		}
-		// log.Infof("doc: %v", doc)
-
-		for _, child := range doc.Child {
-			if child == nil {
-				continue
-			}
-			log.Infof("child: %s", *child.Title)
-		}
-
+	purchaseStatusRes := buyRes.PurchaseStatusResponse
+	if purchaseStatusRes == nil {
+		return nil, fmt.Errorf("response does not contain purchase status response")
 	}
 
-	return nil, nil
+	appDeliveryData := purchaseStatusRes.AppDeliveryData
+	if appDeliveryData == nil {
+		return nil, fmt.Errorf("response does not contain app delivery data")
+	}
+	return appDeliveryData, nil
+}
+
+/**
+Download an APK from the playstore to the destination directory
+
+In order to download the app, the app is "purchased" first
+If `versionCode` is zero, download the latest version
+if `apkName` is "", uses `packageName` as filename
+*/
+func (client *Client) DownloadToDisk(
+	packageName string, versionCode int, downloadDir string, apkName string) (chan DownloadProgress, error) {
+
+	deliveryData, err := client.GetAppDeliveryData(packageName, versionCode)
+	if err != nil {
+		return nil, nil
+	}
+
+	if deliveryData.DownloadUrl == nil {
+		return nil, fmt.Errorf("deliver data does not contain download url")
+	}
+
+	downloadUrl := *deliveryData.DownloadUrl
+	log.Debugf("Downloading %s from %s", packageName, downloadUrl)
+
+	checksum, err := base64.RawStdEncoding.DecodeString(*deliveryData.Sha1)
+	if err != nil {
+		return nil, err
+	}
+
+	if apkName == "" {
+		apkName = fmt.Sprintf("%s.apk", packageName)
+	}
+
+	filepath := path.Join(downloadDir, apkName)
+	return downloadFileToDisk(downloadUrl, *deliveryData.DownloadSize, checksum, filepath)
 }
 
 /**
