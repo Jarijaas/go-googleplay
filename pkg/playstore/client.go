@@ -125,10 +125,12 @@ func (client *Client) Search(query string) (*pb.SearchResponse, error) {
 Get app details by its package name
 */
 func (client *Client) GetDetails(packageName string) (*pb.DocV2, error) {
+
 	resWrap, err := client.send(fmt.Sprintf("%s?doc=%s", DetailsUrl, packageName), nil)
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("Details response: %v", resWrap.Payload.DetailsResponse.DocV2.Details.AppDetails.VersionCode)
 	return resWrap.Payload.DetailsResponse.DocV2, nil
 }
 
@@ -159,6 +161,11 @@ func (client *Client) GetAppDeliveryData(packageName string, versionCode int) (*
 		doc, err := client.GetDetails(packageName)
 		if err != nil {
 			return nil, err
+		}
+
+		if doc.Details.AppDetails.VersionCode == nil {
+			return nil, fmt.Errorf("App details did not contain version code. " +
+				"Is the gsfId correct, does the app support the specified device config?")
 		}
 		versionCode = int(*doc.Details.AppDetails.VersionCode)
 
