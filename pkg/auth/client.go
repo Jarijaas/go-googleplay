@@ -135,7 +135,7 @@ func (client *Client) getGsfId() (string, error) {
 			Timestamp:      int64P(int64(time.Now().Second())),
 			GoogleServices: intP(12673002),
 			Device:         stringP("alien_jolla_bionic"),
-			SdkVersion:     intP(16),
+			SdkVersion:     intP(30), // Android 11, the app must support this sdk version
 			Model:          stringP("Jolla"),
 			Manufacturer:   stringP("unknown"),
 			BuildProduct:   stringP("alien_jolla_bionic"),

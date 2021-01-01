@@ -130,7 +130,6 @@ func (client *Client) GetDetails(packageName string) (*pb.DocV2, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("Details response: %v", resWrap.Payload.DetailsResponse.DocV2.Details.AppDetails.VersionCode)
 	return resWrap.Payload.DetailsResponse.DocV2, nil
 }
 
@@ -211,7 +210,10 @@ func (client *Client) DownloadToDisk(
 	downloadUrl := *deliveryData.DownloadUrl
 	log.Debugf("Downloading %s from %s", packageName, downloadUrl)
 
-	checksum, err := base64.RawStdEncoding.DecodeString(*deliveryData.Sha1)
+	log.Debugf("%s sha1: %s, sha256: %s (b64 encoded)",
+		packageName, *deliveryData.Sha1, *deliveryData.Sha256)
+
+	checksum, err := base64.RawURLEncoding.DecodeString(*deliveryData.Sha1)
 	if err != nil {
 		return nil, err
 	}
