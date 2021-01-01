@@ -226,3 +226,19 @@ func getPlayStoreAuthSubToken(email string, encryptedPasswd string) (string, err
 	log.Debugf("Got master token: %s", masterToken)
 	return getSubToken(masterToken)
 }
+
+func boolP(value bool) *bool {
+	return &value
+}
+
+func intP(value int32) *int32 {
+	return &value
+}
+
+func int64P(value int64) *int64 {
+	return &value
+}
+
+func stringP(value string) *string {
+	return &value
+}

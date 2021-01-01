@@ -86,8 +86,8 @@ func (client *Client) send(url string, bodyParams *url.Values) (*pb.ResponseWrap
 		return nil, err
 	}
 	if reqRes.StatusCode != 200 {
-		return nil, fmt.Errorf("unexpected response for %s: %s (%d)",
-			url, reqRes.Status, reqRes.StatusCode)
+		return nil, fmt.Errorf("unexpected response for %s: %s",
+			url, reqRes.Status)
 	}
 
 	data, err := ioutil.ReadAll(reqRes.Body)
@@ -106,7 +106,6 @@ func (client *Client) send(url string, bodyParams *url.Values) (*pb.ResponseWrap
 	}
 	return &responseWrapper, nil
 }
-
 
 func (client *Client) GetAuthClient() *auth.Client {
 	return client.authClient

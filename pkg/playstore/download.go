@@ -93,10 +93,7 @@ func downloadFileToDisk(url string, downloadSize int64, sha1Checksum []byte, fil
 // DownloadFile downloads a file and write it to disk during download
 // https://golangcode.com/download-a-file-from-a-url/
 func downloadFile(url string) (io.ReadCloser, error) {
-	client, err := createHTTPClient()
-	if err != nil {
-		return nil, err
-	}
+	client := &http.Client{}
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
