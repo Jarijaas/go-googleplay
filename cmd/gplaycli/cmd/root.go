@@ -21,7 +21,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "gplay",
-	Short: "Client for the Google Playstore, can download apps and browse the store",
+	Short: "Client for Google Playstore, can download apps",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if verbose {
 			log.SetLevel(log.DebugLevel)
@@ -70,13 +70,11 @@ func createPlaystoreClient() (*playstore.Client, error) {
 	}
 
 	// Force reauthentication by removing current tokens
-	if forceLogin {
+	// Ask for creds if not authenticated
+	if forceLogin || !gplay.IsValidAuthToken() {
 		authCfg.GsfId = ""
 		authCfg.AuthSubToken = ""
-	}
 
-	// Ask for creds if not authenticated
-	if !gplay.IsValidAuthToken(){
 		log.Info("Auth token is not valid, use email and password")
 
 		if authCfg.Email == "" {

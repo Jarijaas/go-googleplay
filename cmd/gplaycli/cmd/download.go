@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/cheggaaa/pb/v3"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +31,8 @@ var downloadCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		log.Debugf("Download %s", appPackageName)
 
 		progressCh, err := gplay.DownloadToDisk(appPackageName, appVersionCode, outDownloadDir, outApkName)
 		if err != nil {

@@ -5,36 +5,32 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/gojektech/heimdall/v6/hystrix"
 	"github.com/golang/protobuf/proto"
 	"github.com/jarijaas/go-gplayapi/pkg/auth"
 	"github.com/jarijaas/go-gplayapi/pkg/common"
 	"github.com/jarijaas/go-gplayapi/pkg/playstore/pb"
 	log "github.com/sirupsen/logrus"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
-	"time"
 )
 
 const (
-	FDFEUrl = common.APIBaseURL + "/fdfe/"
-	SearchUrl = FDFEUrl + "search"
-	TocUrl = FDFEUrl + "toc"
-	DetailsUrl = FDFEUrl + "details"
+	FDFEUrl     = common.APIBaseURL + "/fdfe/"
+	SearchUrl   = FDFEUrl + "search"
+	TocUrl      = FDFEUrl + "toc"
+	DetailsUrl  = FDFEUrl + "details"
 	PurchaseUrl = FDFEUrl + "purchase"
 )
 
 type Client struct {
-
 	authClient *auth.Client
-
 }
 
 type Config struct {
-
 	AuthConfig *auth.Config
 }
 
@@ -49,149 +45,92 @@ func CreatePlaystoreClient(config *Config) (*Client, error) {
 	}, nil
 }
 
+func (client *Client) send(url string, bodyParams *url.Values) (*pb.ResponseWrapper, error) {
+	// Do auth if needed
+	if !client.authClient.HasAuthToken() {
+		if err := client.authClient.Authenticate(); err != nil {
+			return nil, err
+		}
+	}
+
+	var body io.Reader
+
+	method := "GET"
+	if bodyParams != nil {
+		method = "POST"
+		body = bytes.NewBufferString(bodyParams.Encode())
+	}
+
+	log.Debugf("%s %s", method, url)
+
+	httpClient, err := createHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
+	req.Header.Set("Authorization", fmt.Sprintf(
+		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
+
+	if bodyParams != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+
+	reqRes, err := httpDoRetryOnNotFound(httpClient, req)
+	if err != nil {
+		return nil, err
+	}
+	if reqRes.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected response for %s: %s (%d)",
+			url, reqRes.Status, reqRes.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(reqRes.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var responseWrapper pb.ResponseWrapper
+	err = proto.Unmarshal(data, &responseWrapper)
+	if err != nil {
+		return nil, err
+	}
+
+	if responseWrapper.Commands != nil && responseWrapper.Commands.DisplayErrorMessage != nil {
+		return &responseWrapper, errors.New(*responseWrapper.Commands.DisplayErrorMessage)
+	}
+	return &responseWrapper, nil
+}
+
+
 func (client *Client) GetAuthClient() *auth.Client {
 	return client.authClient
 }
 
-func (client *Client) get(url string) (*pb.ResponseWrapper, error) {
-	// Do auth if needed
-	if !client.authClient.HasAuthToken() {
-		if err := client.authClient.Authenticate(); err != nil {
-			return nil, err
-		}
-	}
-
-	httpClient, err := createHTTPClient()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
-	req.Header.Set("Authorization", fmt.Sprintf(
-		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
-
-	reqRes, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ioutil.ReadAll(reqRes.Body)
-
-	var responseWrapper pb.ResponseWrapper
-	err = proto.Unmarshal(data, &responseWrapper)
-	if err != nil {
-		return nil, err
-	}
-
-	if responseWrapper.Commands != nil && responseWrapper.Commands.DisplayErrorMessage != nil {
-		return &responseWrapper, errors.New(*responseWrapper.Commands.DisplayErrorMessage)
-	}
-	return &responseWrapper, nil
-}
-
-func (client *Client) post(url string, params *url.Values) (*pb.ResponseWrapper, error) {
-	// Do auth if needed
-	if !client.authClient.HasAuthToken() {
-		if err := client.authClient.Authenticate(); err != nil {
-			return nil, err
-		}
-	}
-
-	httpClient, err := createHTTPClient()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBufferString(params.Encode()))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
-	req.Header.Set("Authorization", fmt.Sprintf(
-		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	reqRes, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ioutil.ReadAll(reqRes.Body)
-
-	var responseWrapper pb.ResponseWrapper
-	err = proto.Unmarshal(data, &responseWrapper)
-	if err != nil {
-		return nil, err
-	}
-
-	if responseWrapper.Commands != nil && responseWrapper.Commands.DisplayErrorMessage != nil {
-		return &responseWrapper, errors.New(*responseWrapper.Commands.DisplayErrorMessage)
-	}
-	return &responseWrapper, nil
-}
-
+// c param is content type, 0=book global?, 1=book, 3=app, 4=video
 func (client *Client) Search(query string) (*pb.SearchResponse, error) {
-
-	// c param is content type, 0=book global?, 1=book, 3=app, 4=video
-
-	resWrap, err := client.get(fmt.Sprintf("%s?c=3&q=%s", SearchUrl, query))
+	resWrap, err := client.send(fmt.Sprintf("%s?c=3&q=%s", SearchUrl, query), nil)
 	if err != nil {
 		return nil, err
 	}
 	return resWrap.Payload.SearchResponse, err
-
-	/*log.Infof("searchResponse: %v", searchRes)
-
-	for _, doc := range searchRes.Doc {
-		if doc == nil {
-			continue
-		}
-
-		log.Infof("Found docId: %s", *doc.Docid)
-
-		if doc.Title != nil {
-			log.Infof("Doc name: %s", *doc.Title)
-		}
-
-		for _, child := range doc.Child {
-			if child == nil {
-				continue
-			}
-			log.Infof("Found child doc: %s", *child.Docid)
-		}
-	}
-
-	log.Infof("Next page url: %s", searchRes.GetNextPageUrl())
-
-	return nil*/
-}
-
-func createHTTPClient() (*hystrix.Client, error) {
-	return hystrix.NewClient(
-		hystrix.WithHTTPTimeout(5 * time.Second),
-		hystrix.WithMaxConcurrentRequests(10),
-		hystrix.WithErrorPercentThreshold(20),
-	), nil
 }
 
 /**
 Get app details by its package name
- */
+*/
 func (client *Client) GetDetails(packageName string) (*pb.DocV2, error) {
-	resWrap, err := client.get(fmt.Sprintf("%s?doc=%s", DetailsUrl, packageName))
+	resWrap, err := client.send(fmt.Sprintf("%s?doc=%s", DetailsUrl, packageName), nil)
 	if err != nil {
 		return nil, err
 	}
 	return resWrap.Payload.DetailsResponse.DocV2, nil
 }
-
 
 func (client *Client) Purchase(packageName string, versionCode int) (*pb.BuyResponse, error) {
 	params := &url.Values{}
@@ -199,7 +138,7 @@ func (client *Client) Purchase(packageName string, versionCode int) (*pb.BuyResp
 	params.Set("doc", packageName)
 	params.Set("vc", strconv.Itoa(versionCode))
 
-	res, err := client.post(PurchaseUrl, params)
+	res, err := client.send(PurchaseUrl, params)
 	if err != nil {
 		return nil, err
 	}
@@ -211,8 +150,9 @@ Get app delivery data (download URL) for application from playstore
 
 In order to download the app, the app is "purchased" first
 If `versionCode` is zero, get delivery data for the latest version
- */
-func (client *Client) GetAppDeliveryData(packageName string, versionCode int) (*pb.AndroidAppDeliveryData, error)  {
+*/
+func (client *Client) GetAppDeliveryData(packageName string, versionCode int) (*pb.AndroidAppDeliveryData, error) {
+	log.Debugf("Get delivery data for %s", packageName)
 
 	// Get latest version code
 	if versionCode == 0 {
@@ -254,7 +194,7 @@ func (client *Client) DownloadToDisk(
 
 	deliveryData, err := client.GetAppDeliveryData(packageName, versionCode)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	if deliveryData.DownloadUrl == nil {
@@ -279,7 +219,7 @@ func (client *Client) DownloadToDisk(
 
 /**
 Check if the client has valid auth creds to the playstore
- */
+*/
 func (client *Client) IsValidAuthToken() bool {
 	_, err := client.Search("")
 	return err == nil

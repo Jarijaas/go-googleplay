@@ -9,7 +9,7 @@ Terminology:
 * AuthSub Token - Authentication token to Playstore, exchanged against account email and password
 
 ```
-Client for the Google Playstore, can download apps and browse the store
+Client for Google Playstore, can download apps
 
 Usage:
   gplay [flags]
@@ -30,11 +30,4 @@ Flags:
   -v, --verbose           Enable debug messages
 
 Use "gplay [command] --help" for more information about a command.
-```
-
-Environment variables
-
-```
-GPLAY_GSFID
-GPLAY_AUTHSUB
 ```
