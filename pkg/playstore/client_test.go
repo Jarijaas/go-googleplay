@@ -19,8 +19,8 @@ func createPlayStoreTestClient(t *testing.T) *Client {
 	}
 
 	authConfig := &auth.Config{
-		GsfId:        os.Getenv(gsfId),
-		AuthSubToken: os.Getenv(authSub),
+		GsfId:        gsfId,
+		AuthSubToken: authSub,
 	}
 
 	client, err := CreatePlaystoreClient(&Config{AuthConfig: authConfig})

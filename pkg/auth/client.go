@@ -239,7 +239,7 @@ func (client *Client) Authenticate() error {
 	authType := client.getAuthType()
 	if authType == Unknown {
 		return fmt.Errorf(
-			"could not select authentication type." +
+			"could not select authentication type. " +
 				"Did you specify the email and the password or alternatively GSFID and authSubToken")
 	}
 
