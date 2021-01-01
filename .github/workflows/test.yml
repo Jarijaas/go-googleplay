@@ -1,4 +1,4 @@
-name: Go
+name: Test
 
 on:
   push:
@@ -30,3 +30,6 @@ jobs:
 
     - name: Test
       run: go test -v ./...
+      env:
+        GPLAY_AUTHSUB: ${{ secrets.GPLAY_AUTHSUB }}
+        GPLAY_GSFID: ${{ secrets.GPLAY_GSFID }}
