@@ -37,9 +37,4 @@ For example, to download whatsapp:
 gplay download --id com.whatsapp --out whatsapp.apk
 ```
 
-Environment variables
-
-```
-GPLAY_GSFID
-GPLAY_AUTHSUB
-```
+This project is based on [NoMore201/googleplay-api](https://github.com/NoMore201/googleplay-api) GNU General Public License
