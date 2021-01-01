@@ -3,96 +3,16 @@ package playstore
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/sha256"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
-	"os"
 )
-
-type DownloadProgress struct {
-	DownloadedSize int64
-	DownloadSize   int64
-	Err            error
-}
-
-func downloadFileToDisk(url string, downloadSize int64, sha1Checksum []byte, filepath string) (chan DownloadProgress, error) {
-	const maxChunkSize = 1 * 1000 * 1000 // 1 MB
-	buffer := make([]byte, maxChunkSize)
-
-	downloadedSize := int64(0)
-
-	data, err := downloadFile(url)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return nil, err
-	}
-
-	h := sha1.New()
-
-	ch := make(chan DownloadProgress)
-	sendDownloadProgress := func(err error) {
-		ch <- DownloadProgress{
-			DownloadedSize: downloadedSize,
-			DownloadSize:   downloadSize,
-			Err:            err,
-		}
-	}
-
-	// Delete the file, if the download was interrupted
-	deleteDownload := func() {
-		_ = os.Remove(filepath)
-	}
-
-	go func() {
-		sendDownloadProgress(nil)
-
-		for downloadedSize < downloadSize {
-			chunkSize := downloadSize - downloadedSize
-			if chunkSize > maxChunkSize {
-				chunkSize = maxChunkSize
-			}
-
-			nRead, err := io.ReadFull(data, buffer[:chunkSize])
-			if err != nil {
-				deleteDownload()
-				sendDownloadProgress(err)
-				break
-			}
-
-			downloadedSize += int64(nRead)
-
-			h.Write(buffer[:nRead])
-
-			_, err = out.Write(buffer[:nRead])
-			if err != nil {
-				deleteDownload()
-				sendDownloadProgress(err)
-				break
-			}
-
-			sendDownloadProgress(nil)
-		}
-
-		if downloadedSize == downloadSize && !bytes.Equal(h.Sum(nil), sha1Checksum) {
-			sendDownloadProgress(fmt.Errorf("checksum mismatch"))
-		}
-		close(ch)
-
-		_ = out.Close()
-		_ = data.Close()
-	}()
-	return ch, nil
-}
-
 
 // DownloadFile downloads a file and write it to disk during download
 // https://golangcode.com/download-a-file-from-a-url/
-func downloadFile(url string) (io.ReadCloser, error) {
+func createDownloadReader(url string) (io.ReadCloser, error) {
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -106,9 +26,61 @@ func downloadFile(url string) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("incorrect status code: %d", resp.StatusCode)
 	}
 	return resp.Body, err
+}
+
+func DownloadVerifySha1(url string, downloadSize int64, checksum []byte) (io.ReadCloser, error) {
+	return DownloadVerify(url, downloadSize, sha1.New(), checksum)
+}
+
+func DownloadVerifySha256(url string, downloadSize int64, checksum []byte) (io.ReadCloser, error) {
+	return DownloadVerify(url, downloadSize, sha256.New(), checksum)
+}
+
+func DownloadVerify(url string, downloadSize int64, hashFunc hash.Hash, checksum []byte) (io.ReadCloser, error) {
+	downloadReader, err := createDownloadReader(url)
+	if err != nil {
+		return nil, err
+	}
+
+	pr, pw := io.Pipe()
+
+	const maxChunkSize = 32 * 1024 // 32 KiB
+	buffer := make([]byte, maxChunkSize)
+
+	downloadedSize := int64(0)
+
+	go func() {
+		for downloadedSize < downloadSize {
+			chunkSize := downloadSize - downloadedSize
+			if chunkSize > maxChunkSize {
+				chunkSize = maxChunkSize
+			}
+
+			nRead, err := io.ReadFull(downloadReader, buffer[:chunkSize])
+			if err != nil {
+				_ = pw.CloseWithError(err)
+				return
+			}
+
+			hashFunc.Write(buffer[:nRead])
+
+			_, err = pw.Write(buffer[:nRead])
+			if err != nil {
+				_ = pw.Close()
+				return
+			}
+			downloadedSize += int64(nRead)
+		}
+
+		if !bytes.Equal(hashFunc.Sum(nil), checksum) {
+			_ = pw.CloseWithError(fmt.Errorf("checksum mismatch"))
+			return
+		}
+		_ = pw.Close()
+	}()
+	return pr, nil
 }

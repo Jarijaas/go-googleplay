@@ -8,6 +8,8 @@ Terminology:
     * Generated against a device config send to Google servers
 * AuthSub Token - Authentication token to Playstore, exchanged against account email and password
 
+## CLI Usage
+
 ```
 Client for Google Playstore, can download apps
 
@@ -36,5 +38,51 @@ For example, to download whatsapp:
 ```
 gplay download --id com.whatsapp --out whatsapp.apk
 ```
+
+## API Usage
+
+To download a file to disk:
+
+````go
+package main
+
+import (
+	"github.com/jarijaas/go-gplayapi/pkg/auth"
+	"github.com/jarijaas/go-gplayapi/pkg/playstore"
+	log "github.com/sirupsen/logrus"
+	"io"
+	"os"
+)
+
+func main()  {
+	gplay, err := playstore.CreatePlaystoreClient(&playstore.Config{
+		AuthConfig: &auth.Config{
+			Email:        "",
+			Password:     "",
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Download the latest version
+	reader, downloadInfo, err := gplay.Download("com.whatsapp", 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("Download size: %d bytes", downloadInfo.Size)
+
+	f, err := os.Create("./whatsapp.apk")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = io.Copy(f, reader)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+````
 
 This project is based on [NoMore201/googleplay-api](https://github.com/NoMore201/googleplay-api) GNU General Public License

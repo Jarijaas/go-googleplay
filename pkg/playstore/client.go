@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strconv"
 )
@@ -187,6 +188,46 @@ func (client *Client) GetAppDeliveryData(packageName string, versionCode int) (*
 	return appDeliveryData, nil
 }
 
+type DownloadInfo struct {
+	Url    string
+	Sha1   []byte
+	Sha256 []byte
+	Size   int64
+}
+
+func (client *Client) GetAppDownloadInfo(packageName string, versionCode int) (*DownloadInfo, error) {
+	deliveryData, err := client.GetAppDeliveryData(packageName, versionCode)
+	if err != nil {
+		return nil, err
+	}
+
+	if deliveryData.DownloadUrl == nil {
+		return nil, fmt.Errorf("deliver data does not contain download Url")
+	}
+
+	downloadUrl := *deliveryData.DownloadUrl
+
+	log.Debugf("%s Sha1: %s, Sha256: %s (b64 encoded)",
+		packageName, *deliveryData.Sha1, *deliveryData.Sha256)
+
+	sha1Checksum, err := base64.RawURLEncoding.DecodeString(*deliveryData.Sha1)
+	if err != nil {
+		return nil, err
+	}
+
+	sha256Checksum, err := base64.RawURLEncoding.DecodeString(*deliveryData.Sha256)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DownloadInfo{
+		Url:    downloadUrl,
+		Sha1:   sha1Checksum,
+		Sha256: sha256Checksum,
+		Size:   *deliveryData.DownloadSize,
+	}, nil
+}
+
 /**
 Download an APK from the playstore to the destination directory
 
@@ -195,34 +236,37 @@ If `versionCode` is zero, download the latest version
 if `apkName` is "", uses `packageName` as filename
 */
 func (client *Client) DownloadToDisk(
-	packageName string, versionCode int, downloadDir string, apkName string) (chan DownloadProgress, error) {
+	packageName string, versionCode int, downloadDir string, apkName string) (err error) {
 
-	deliveryData, err := client.GetAppDeliveryData(packageName, versionCode)
+	reader, _, err := client.Download(packageName, versionCode)
 	if err != nil {
-		return nil, err
-	}
-
-	if deliveryData.DownloadUrl == nil {
-		return nil, fmt.Errorf("deliver data does not contain download url")
-	}
-
-	downloadUrl := *deliveryData.DownloadUrl
-	log.Debugf("Downloading %s from %s", packageName, downloadUrl)
-
-	log.Debugf("%s sha1: %s, sha256: %s (b64 encoded)",
-		packageName, *deliveryData.Sha1, *deliveryData.Sha256)
-
-	checksum, err := base64.RawURLEncoding.DecodeString(*deliveryData.Sha1)
-	if err != nil {
-		return nil, err
+		return
 	}
 
 	if apkName == "" {
 		apkName = fmt.Sprintf("%s.apk", packageName)
 	}
-
 	filepath := path.Join(downloadDir, apkName)
-	return downloadFileToDisk(downloadUrl, *deliveryData.DownloadSize, checksum, filepath)
+
+	f, err := os.Create(filepath)
+	if err != nil {
+		return
+	}
+
+	_, err = io.Copy(f, reader)
+	return
+}
+
+func (client *Client) Download(packageName string, versionCode int) (io.ReadCloser, *DownloadInfo, error) {
+	info, err := client.GetAppDownloadInfo(packageName, versionCode)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Debugf("Downloading %s from %s", packageName, info.Url)
+
+	reader, err := DownloadVerifySha256(info.Url, info.Size, info.Sha256)
+	return reader, info,err
 }
 
 /**

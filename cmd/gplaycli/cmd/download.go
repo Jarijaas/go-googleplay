@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/cheggaaa/pb/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"io"
+	"os"
+	"path"
 )
 
 var (
@@ -34,27 +38,26 @@ var downloadCmd = &cobra.Command{
 
 		log.Debugf("Download %s", appPackageName)
 
-		progressCh, err := gplay.DownloadToDisk(appPackageName, appVersionCode, outDownloadDir, outApkName)
+		reader, downloadInfo, err := gplay.Download(appPackageName, appVersionCode)
 		if err != nil {
 			return err
 		}
 
-		var bar *pb.ProgressBar
+		bar := pb.Full.Start64(downloadInfo.Size)
+		barReader := bar.NewProxyReader(reader)
 
-		for progress := range progressCh {
-			if bar == nil {
-				bar = pb.Start64(progress.DownloadSize)
-				bar.Set(pb.Bytes, true)
-			}
-
-			bar.SetCurrent(progress.DownloadedSize)
-			if progress.Err != nil {
-				return err
-			}
+		if outApkName == "" {
+			outApkName = fmt.Sprintf("%s.apk", appPackageName)
 		}
+		filepath := path.Join(outDownloadDir, outApkName)
+
+		f, err := os.Create(filepath)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(f, barReader)
 
 		bar.Finish()
-
 		return err
 	},
 }
