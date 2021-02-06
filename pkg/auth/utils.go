@@ -176,7 +176,7 @@ func getSubToken(masterToken string) (string, error) {
 		return "", fmt.Errorf("google auth API returned error: %s", errorDesc)
 	}
 
-	log.Infof("Round token results: %v", kvs)
+	log.Debugf("Round token results: %v", kvs)
 	return kvs["auth"], nil
 }
 
@@ -215,7 +215,8 @@ func getPlayStoreAuthSubToken(email string, encryptedPasswd string) (string, err
 
 	errorDesc, has := kvs["error"]
 	if has {
-		return "", fmt.Errorf("google auth API returned error: %s", errorDesc)
+		log.Debugf("Error response contents: %v", kvs)
+		return "", fmt.Errorf("google auth API returned error: %s, info: %s", errorDesc, kvs["info"])
 	}
 
 	masterToken, has := kvs["token"]

@@ -19,6 +19,10 @@ var loginCmd = &cobra.Command{
 		}
 
 		auth := gplay.GetAuthClient()
+		err = auth.Authenticate()
+		if err != nil {
+			return err
+		}
 
 		log.Infof("GPLAY_GSFID=%s", auth.GetGsfId())
 		log.Infof("GPLAY_AUTHSUB=%s", auth.GetAuthSubToken())

@@ -75,7 +75,7 @@ func createPlaystoreClient() (*playstore.Client, error) {
 		authCfg.GsfId = ""
 		authCfg.AuthSubToken = ""
 
-		log.Info("Auth token is not valid, use email and password")
+		log.Debug("Auth token is not valid, use email and password")
 
 		if authCfg.Email == "" {
 			log.Info("Enter email:")
