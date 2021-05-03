@@ -25,8 +25,11 @@ func parseKeyValues(r io.Reader) map[string]string {
 	kvs :=  map[string]string{}
 
 	for scanner.Scan() {
-		parts := strings.Split(scanner.Text(), "=")
-		kvs[strings.ToLower(strings.TrimSuffix(parts[0], "="))] = parts[1]
+		row := scanner.Text()
+		firstIdx := strings.Index(row, "=")
+		key := row[:firstIdx]
+		value := row[firstIdx + 1:]
+		kvs[strings.ToLower(key)] = value
 	}
 	return kvs
 }
@@ -215,8 +218,10 @@ func getPlayStoreAuthSubToken(email string, encryptedPasswd string) (string, err
 
 	errorDesc, has := kvs["error"]
 	if has {
-		log.Debugf("Error response contents: %v", kvs)
-		return "", fmt.Errorf("google auth API returned error: %s, info: %s", errorDesc, kvs["info"])
+		if kvs["info"] == "WebLoginRequired" {
+			return "", fmt.Errorf("Web login required, browse to: %s", kvs["url"])
+		}
+		return "", fmt.Errorf("Unknown Google Auth API error: %s, %v", errorDesc, kvs)
 	}
 
 	masterToken, has := kvs["token"]

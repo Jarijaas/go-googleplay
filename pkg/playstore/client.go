@@ -86,10 +86,6 @@ func (client *Client) send(url string, bodyParams *url.Values) (*pb.ResponseWrap
 	if err != nil {
 		return nil, err
 	}
-	if reqRes.StatusCode != 200 {
-		return nil, fmt.Errorf("unexpected response for %s: %s",
-			url, reqRes.Status)
-	}
 
 	data, err := ioutil.ReadAll(reqRes.Body)
 	if err != nil {
@@ -100,6 +96,11 @@ func (client *Client) send(url string, bodyParams *url.Values) (*pb.ResponseWrap
 	err = proto.Unmarshal(data, &responseWrapper)
 	if err != nil {
 		return nil, err
+	}
+
+	if reqRes.StatusCode != 200 {
+		return &responseWrapper, fmt.Errorf("unexpected response for %s: %s",
+			url, reqRes.Status)
 	}
 
 	if responseWrapper.Commands != nil && responseWrapper.Commands.DisplayErrorMessage != nil {
@@ -141,6 +142,7 @@ func (client *Client) Purchase(packageName string, versionCode int) (*pb.BuyResp
 
 	res, err := client.send(PurchaseUrl, params)
 	if err != nil {
+		log.Errorf("Purchase error: %v, %v", res, err)
 		return nil, err
 	}
 	return res.Payload.BuyResponse, nil
