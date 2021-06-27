@@ -74,10 +74,10 @@ func (client *Client) send(url string, bodyParams *url.Values) (*pb.ResponseWrap
 		return nil, err
 	}
 
-	req.Header.Set("X-DFE-Device-Id", client.authClient.GetGsfId())
+	// req.Header.Set("X-Dfe-Device-Id", client.authClient.GetGsfId())
+	req.Header.Set("X-Dfe-Device-Id", "3d38affdbd8ce838")
 	req.Header.Set("Authorization", fmt.Sprintf(
 		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
-
 	if bodyParams != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
@@ -122,8 +122,8 @@ func (client *Client) Search(query string) (*pb.SearchResponse, error) {
 	return resWrap.Payload.SearchResponse, err
 }
 
-/**
-Get app details by its package name
+/*
+GetDetails fetches details of a application
 */
 func (client *Client) GetDetails(packageName string) (*pb.DocV2, error) {
 
@@ -148,8 +148,8 @@ func (client *Client) Purchase(packageName string, versionCode int) (*pb.BuyResp
 	return res.Payload.BuyResponse, nil
 }
 
-/**
-Get app delivery data (download URL) for application from playstore
+/*
+GetAppDeliveryData fetches delivery data (download URL) for application from playstore
 
 In order to download the app, the app is "purchased" first
 If `versionCode` is zero, get delivery data for the latest version
@@ -230,8 +230,8 @@ func (client *Client) GetAppDownloadInfo(packageName string, versionCode int) (*
 	}, nil
 }
 
-/**
-Download an APK from the playstore to the destination directory
+/*
+DownloadToDisk downloads an APK from the playstore to the destination directory
 
 In order to download the app, the app is "purchased" first
 If `versionCode` is zero, download the latest version
@@ -271,8 +271,8 @@ func (client *Client) Download(packageName string, versionCode int) (io.ReadClos
 	return reader, info,err
 }
 
-/**
-Check if the client has valid auth creds to the playstore
+/*
+IsValidAuthToken checks if the client has valid auth creds to the playstore
 */
 func (client *Client) IsValidAuthToken() bool {
 	_, err := client.Search("")

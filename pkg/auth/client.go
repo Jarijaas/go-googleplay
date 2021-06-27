@@ -239,7 +239,7 @@ func (client *Client) Authenticate() error {
 			return err
 		}
 
-		client.config.AuthSubToken, err = getPlayStoreAuthSubToken(client.config.Email, encryptedPasswd)
+		client.config.AuthSubToken, err = getPlayStoreAuthSubToken(client.config.Email, encryptedPasswd, client.config.GsfId)
 		if err != nil {
 			return err
 		}

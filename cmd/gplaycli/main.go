@@ -6,7 +6,6 @@ import (
 )
 
 func main()  {
-
 	log.SetFormatter(&log.TextFormatter{ForceColors: true})
 
 	cmd.Execute()
