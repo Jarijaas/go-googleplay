@@ -1,6 +1,6 @@
 module github.com/jarijaas/go-gplayapi
 
-go 1.15
+go 1.16
 
 require (
 	github.com/ImVexed/muon v0.0.0-20191209030120-589db8f0f250
@@ -16,4 +16,7 @@ require (
 	github.com/zalando/go-keyring v0.1.0
 	golang.org/x/crypto v0.0.0-20201217014255-9d1352758620
 	google.golang.org/protobuf v1.25.0
+	github.com/jarijaas/goadb v0.0.0-20201208042340-620e0e950ed7
 )
+
+replace github.com/jarijaas/goadb v0.0.0-20201208042340-620e0e950ed7 => ../goadb

@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-var propPathsWhitelist = []string{
-	"ro.product.*", "ro.opengles.*", "ro.system.*", "ro.build.*", "ro.vendor.*",
-}
-
-var propPathsBlacklist = []string{
-	"*imei*", // try to filter out props that may contain imei
-}
 
 func TestParseGetPropsOutput(t *testing.T) {
 	data, err := ioutil.ReadFile("./testdata/device.getprops")
@@ -20,7 +13,7 @@ func TestParseGetPropsOutput(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	props := parseGetPropsOutput(string(data))
+	props := parseGetPropOutput(string(data))
 
 	const testProp = "ro.product.brand"
 	const validPropValue = "Xiaomi"
@@ -30,5 +23,12 @@ func TestParseGetPropsOutput(t *testing.T) {
 		}
 	} else {
 		log.Fatalf("Props should have %s", testProp)
+	}
+}
+
+func TestGetBundledProfileNames(t *testing.T) {
+	names := GetBundledProfileNames()
+	if len(names) == 0 {
+		t.Fatal("Could not find bundled profiles")
 	}
 }

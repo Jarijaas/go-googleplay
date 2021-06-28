@@ -4,24 +4,61 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"strings"
 )
 
-func parseGetPropsOutput(data string) map[string][]string {
-	beginBrackets := strings.Split(data, "[")
+var propPathsWhitelist = []string{
+	"ro.product.*", "ro.opengles.*", "ro.system.*", "ro.build.*", "ro.vendor.*",
+}
 
+var propPathsBlacklist = []string{
+	".*imei.*", // try to filter out props that may contain imei or other sensitive information
+	".*serial.*",
+	".*iccid.*",
+}
+
+
+func parseGetPropOutput(data string) map[string][]string {
 	kv := map[string][]string{}
 
-	// 2 [ and ] brackets per key,value pair
-	for i := 0; i < len(beginBrackets) - 2; i += 2 {
-		key := beginBrackets[i + 1]
-		key = key[:strings.Index(key, "]: ")]
-		value := beginBrackets[i + 2]
+	entryRegex := regexp.MustCompile(`(?m:^\[(.*)]: \[(.*)])`)
 
-		value = value[:strings.Index(value, "]")] // ends with closing bracket and new line
+	entries := entryRegex.FindAllStringSubmatch(data, -1)
+	for _, entry := range entries {
+		key := entry[1]
+		value := entry[2]
+
+		isInWhitelist := false
+		isInBlacklist := false
+
+		/*
+			Filter out props that are not in the whitelist
+		*/
+		for _, path := range propPathsWhitelist {
+			if matched, _ := regexp.MatchString(path, key); matched {
+				isInWhitelist = true
+				break
+			}
+		}
+		if !isInWhitelist {
+			continue
+		}
+
+		/*
+			Filter out props that are in the blacklist
+		*/
+		for _, path := range propPathsBlacklist {
+			if matched, _ := regexp.MatchString(path, key); matched {
+				isInBlacklist = true
+				break
+			}
+		}
+		if isInBlacklist {
+			continue
+		}
 		kv[key] = strings.Split(strings.TrimSpace(value), ",")
 	}
-
 	return kv
 }
 
