@@ -9,7 +9,7 @@ import (
 )
 
 var propPathsWhitelist = []string{
-	"ro.product.*", "ro.opengles.*", "ro.system.*", "ro.build.*", "ro.vendor.*",
+	"ro.product.*", "ro.opengles.*", "ro.system.*", "ro.build.*", "ro.vendor.*", ".*.lcd_density",
 }
 
 var propPathsBlacklist = []string{

@@ -1,7 +1,7 @@
 package adb
 
 import (
-	goadb "github.com/jarijaas/goadb"
+	goadb "github.com/zach-klippenstein/goadb"
 )
 
 type Client struct {

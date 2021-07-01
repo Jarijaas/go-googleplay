@@ -404,6 +404,10 @@ message Feature {
   optional string label = 1;
   optional string value = 3;
 }
+message FeatureFlag {
+  optional string name = 1;
+  optional bool value = 2;
+}
 message DeviceConfigurationProto {
   optional int32 touchScreen = 1;
   optional int32 keyboard = 2;
@@ -422,6 +426,7 @@ message DeviceConfigurationProto {
   repeated string glExtension = 15;
   optional int32 deviceClass = 16;
   optional int32 maxApkDownloadSizeMb = 17;
+  repeated FeatureFlag featureFlags = 26;
 }
 message Document {
   optional Docid docid = 1;
@@ -1126,6 +1131,7 @@ message AndroidCheckinRequest {
   optional int32 fragment = 20;
   optional string userName = 21;
   optional int32 userSerialNumber = 22;
+  optional string droidguardRules = 24;
 }
 message AndroidCheckinResponse {
   optional bool statsOk = 1;
@@ -1144,6 +1150,10 @@ message GservicesSetting {
   optional bytes name = 1;
   optional bytes value = 2;
 }
+message GclientEntry {
+  required int32 id = 1;
+  required string name = 2;
+}
 message AndroidBuildProto {
   optional string id = 1;
   optional string product = 2;
@@ -1159,6 +1169,8 @@ message AndroidBuildProto {
   optional string manufacturer = 12;
   optional string buildProduct = 13;
   optional bool otaInstalled = 14;
+  repeated GclientEntry clients = 15;
+  optional string securityPatchVersion = 19;
 }
 message AndroidCheckinProto {
   optional AndroidBuildProto build = 1;
@@ -1170,6 +1182,8 @@ message AndroidCheckinProto {
   optional string simOperator = 7;
   optional string roaming = 8;
   optional int32 userNumber = 9;
+  optional int32 unk1 = 14;
+  optional string connectionType = 19;
 }
 message AndroidEventProto {
   optional string tag = 1;

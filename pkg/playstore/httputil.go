@@ -25,7 +25,7 @@ func httpDoRetryOnNotFound(httpClient *hystrix.Client, req *http.Request) (res *
 		if err != nil {
 			return
 		}
-		if res.StatusCode == 404 {
+		if res.StatusCode == 404 || res.StatusCode == 500 {
 			time.Sleep(5 * time.Second)
 			continue
 		}

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/jarijaas/go-gplayapi/pkg/config"
 	"github.com/jarijaas/go-gplayapi/pkg/device"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -8,14 +9,14 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(deviceCmd)
-	deviceCmd.AddCommand(cloneCmd)
-	deviceCmd.AddCommand(listProfilesCmd)
+	rootCmd.AddCommand(profileCmd)
+	profileCmd.AddCommand(cloneCmd)
+	profileCmd.AddCommand(listProfilesCmd)
 }
 
-var deviceCmd = &cobra.Command{
-	Use: "device",
-	Short: "Device operations",
+var profileCmd = &cobra.Command{
+	Use: "profile",
+	Short: "Profile operations",
 }
 
 var cloneCmd = &cobra.Command{
@@ -29,19 +30,18 @@ Tries to filter out sensitive values. Review the file before releasing it public
 			return err
 		}
 
-		filepath := path.Join("./", profile.PreferredFilename())
-
+		filepath := path.Join(config.GetConfigDirectoryProfilesPath(), profile.PreferredFilename())
 		log.Infof("Save device profile to %s", filepath)
 		return profile.SaveToFile(filepath)
 	},
 }
 
 var listProfilesCmd = &cobra.Command{
-	Use: "profiles",
+	Use: "list",
 	Short: "List known device profiles",
 	Run: func(cmd *cobra.Command, args []string) {
-		for _, name := range device.GetBundledProfileNames() {
-			log.Info(name)
+		for _, prof := range device.GetAllProfiles() {
+			log.Info(prof.Name)
 		}
 	},
 }

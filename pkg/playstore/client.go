@@ -36,13 +36,13 @@ type Config struct {
 }
 
 func CreatePlaystoreClient(config *Config) (*Client, error) {
-	authedClient, err := auth.CreatePlaystoreAuthClient(config.AuthConfig)
+	authClient, err := auth.CreatePlaystoreAuthClient(config.AuthConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		authClient: authedClient,
+		authClient: authClient,
 	}, nil
 }
 
@@ -74,8 +74,7 @@ func (client *Client) send(url string, bodyParams *url.Values) (*pb.ResponseWrap
 		return nil, err
 	}
 
-	// req.Header.Set("X-Dfe-Device-Id", client.authClient.GetGsfId())
-	req.Header.Set("X-Dfe-Device-Id", "3d38affdbd8ce838")
+	req.Header.Set("X-Dfe-Device-Id", client.authClient.GetGsfId())
 	req.Header.Set("Authorization", fmt.Sprintf(
 		"GoogleLogin auth=%s", client.authClient.GetAuthSubToken()))
 	if bodyParams != nil {

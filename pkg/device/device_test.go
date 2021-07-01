@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-
 func TestParseGetPropsOutput(t *testing.T) {
 	data, err := ioutil.ReadFile("./testdata/device.getprops")
 	if err != nil {
@@ -27,8 +26,21 @@ func TestParseGetPropsOutput(t *testing.T) {
 }
 
 func TestGetBundledProfileNames(t *testing.T) {
-	names := GetBundledProfileNames()
-	if len(names) == 0 {
+	profs := GetBundledProfiles()
+	if len(profs) == 0 {
 		t.Fatal("Could not find bundled profiles")
+	}
+}
+
+func TestVersionCodeRegexParse(t *testing.T) {
+	versionCode := parsePMDumpVersionCode(`
+        863da0b com.google.android.gms/.ads.measurement.GmpConversionTrackingBrokerService filter 5fcd566
+    versionCode=17785037 minSdk=28 targetSdk=28
+    versionName=17.7.85 (100400-253824076)
+    signatures=PackageSignatures{7f248cb version:3, signatures:[e3ca78d8], past signatures:[]}
+`)
+
+	if versionCode != 17785037 {
+		log.Fatalf("invalid version code match: %d", versionCode)
 	}
 }

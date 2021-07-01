@@ -30,6 +30,8 @@ func createPlayStoreTestClient(t *testing.T) *Client {
 }
 
 func TestGetAppDetails(t *testing.T) {
+	t.Skip("disabled")
+
 	client := createPlayStoreTestClient(t)
 
 	res, err := client.GetDetails(TestPackageName)
@@ -47,6 +49,8 @@ func TestGetAppDetails(t *testing.T) {
 }
 
 func TestDownloadApp(t *testing.T) {
+	t.Skip("disabled")
+
 	client := createPlayStoreTestClient(t)
 
 	res, err := client.GetAppDeliveryData(TestPackageName, 0)

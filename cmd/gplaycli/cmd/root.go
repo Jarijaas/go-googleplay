@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/jarijaas/go-gplayapi/pkg/auth"
+	"github.com/jarijaas/go-gplayapi/pkg/device"
 	"github.com/jarijaas/go-gplayapi/pkg/playstore"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -17,6 +18,7 @@ var (
 	authSub string
 	forceLogin bool
 	verbose bool
+	deviceProfileName string
 )
 
 var rootCmd = &cobra.Command{
@@ -34,6 +36,8 @@ func Execute() {
 	rootCmd.PersistentFlags().StringVar(&password, "password", "", "")
 	rootCmd.PersistentFlags().StringVar(&gsfId, "gsfId", "",
 		"Alternatively, set env var GPLAY_GSFID")
+	rootCmd.PersistentFlags().StringVar(&deviceProfileName, "profile", "",
+		"Device profile for GSFID")
 	rootCmd.PersistentFlags().StringVar(&authSub, "authSub", "",
 		"Alternatively, set env var GPLAY_AUTHSUB")
 	rootCmd.PersistentFlags().BoolVar(&forceLogin, "force-login", false,
@@ -55,11 +59,31 @@ func createPlaystoreClient() (*playstore.Client, error) {
 		authSub = os.Getenv("GPLAY_AUTHSUB")
 	}
 
+	var deviceProfile *device.Profile
+	var err error
+
+	if deviceProfileName != "" {
+		for _, profile := range device.GetAllProfiles() {
+			if profile.Name == deviceProfileName {
+				deviceProfile, err = device.LoadProfile(profile)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		if deviceProfile == nil {
+			return nil, fmt.Errorf("could not find profile \"%s\"", deviceProfileName)
+		}
+	}
+
+
 	authCfg := &auth.Config{
 		Email:        email,
 		Password:     password,
 		GsfId:        gsfId,
 		AuthSubToken: authSub,
+		DeviceProfile: deviceProfile,
 	}
 
 	gplay, err := playstore.CreatePlaystoreClient(&playstore.Config{
@@ -95,7 +119,7 @@ func createPlaystoreClient() (*playstore.Client, error) {
 		}
 	} else {
 		log.Debugf(
-			"Current gsfId and authSubToke are valid. To force reauthentication, use --force-login flag")
+			"Current gsfId and authSubToken are valid. To force reauthentication, use --force-login flag")
 	}
 	return gplay, err
 }
