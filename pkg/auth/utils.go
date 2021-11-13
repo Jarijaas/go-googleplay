@@ -219,31 +219,37 @@ func doBrowserVerification(url string) (string, error) {
 	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
 	defer cancel()
 
-	chromedp.ListenTarget(taskCtx, func(ev interface{}) {
-		switch ev := ev.(type) {
+	log.Debug("Begin listening for auth_code cookie")
 
-		case *network.EventResponseReceived:
-			resp := ev.Response
 
-			if len(resp.Headers) != 0 {
-				cookies := resp.Headers["set-cookie"]
-				if cookies != nil {
-					rawCookies := cookies.(string)
 
-					header := http.Header{}
-					header.Add("Cookie", rawCookies)
-					req := http.Request{Header: header}
-					for _, cookie := range req.Cookies() {
+
+	err := chromedp.Run(taskCtx, chromedp.Navigate(url), chromedp.ActionFunc(func(ctx context.Context) error {
+
+
+		chromedp.ListenTarget(ctx, func(ev interface{}) {
+			switch ev := ev.(type) {
+
+			case *network.EventResponseReceived:
+				_ = ev.Response
+
+				go func() {
+					cookies, err := network.GetCookies().Do(ctx)
+					if err != nil {
+						log.Warn(err)
+					}
+
+					for _, cookie := range cookies {
 						if cookie.Name == "oauth_code" {
 							verificationCompleted <- cookie.Value
+							ctx.Done()
 						}
 					}
-				}
+				}()
 			}
-		}
-	})
-
-	err := chromedp.Run(taskCtx, chromedp.Navigate(url))
+		})
+		return nil
+	}))
 	if err != nil {
 		return "", err
 	}
@@ -292,7 +298,7 @@ func getMasterTokenFromOAuthCode(email string, gsfId string, code string, device
 	if token, has := kvs["token"]; has {
 		return token, nil
 	}
-	return "", fmt.Errorf("OAuth response did not contain master token")
+	return "", fmt.Errorf("OAuth response did not contain master token. Response: %v", kvs)
 }
 
 func getPlayStoreAuthSubToken(email string, encryptedPasswd string, gsfId string, device *device.Profile) (string, error) {
